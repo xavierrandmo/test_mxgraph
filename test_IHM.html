@@ -1,0 +1,188 @@
+<html>
+<head>
+    <title>First test, Boiboites</title>
+    <!-- Mise en place du chemin de base -->
+    <script type="text/javascript">
+        mxBasePath = '../src';
+    </script>
+
+    <!-- Charge et initialise la librairie -->
+    <script type="text/javascript" src="../src/js/mxClient.js"></script>
+
+    <!-- Premiers test -->
+    <script type="text/javascript">
+    
+    function main(container)
+    {
+        // Teste si le browser est supporté
+        if (!mxClient.isBrowserSupported())
+        {
+            // Envoie un message d'erreur.
+            mxUtils.error("Le browser n'est pas supporté", 200, false);
+        }
+        else
+        {   
+            // Accrocher aux points fixes
+            if (0)
+            {
+                mxConstraintHandler.prototype.intersects = function(icon, point, source, existingEdge)
+                {
+                    return (!source || existingEdge) || mxUtils.intersects(icon.bounds, point);
+                }
+            }
+            var mxConnectionHandlerUpdateEdgeState = mxConnectionHandler.prototype.updateEdgeState;
+            mxConnectionHandler.prototype.updateEdgeState = function(pt, constraint)
+            {
+                if (pt != null && this.previous != null)
+                {
+                    var constraints = this.graph.getAllConnectionConstraints(this.previous);
+                    var nearestConstraint = null;
+                    var dist = null;
+                
+                    for (var i = 0; i < constraints.length; i++)
+                    {
+                        var cp = this.graph.getConnectionPoint(this.previous, constraints[i]);
+                        
+                        if (cp != null)
+                        {
+                            var tmp = (cp.x - pt.x) * (cp.x - pt.x) + (cp.y - pt.y) * (cp.y - pt.y);
+                        
+                            if (dist == null || tmp < dist)
+                            {
+                                nearestConstraint = constraints[i];
+                                dist = tmp;
+                            }
+                        }
+                    }
+                    
+                    if (nearestConstraint != null)
+                    {
+                        this.sourceConstraint = nearestConstraint;
+                    }
+                    
+                    // In case the edge style must be changed during the preview:
+                    // this.edgeState.style['edgeStyle'] = 'orthogonalEdgeStyle';
+                    // And to use the new edge style in the new edge inserted into the graph,
+                    // update the cell style as follows:
+                    //this.edgeState.cell.style = mxUtils.setStyle(this.edgeState.cell.style, 'edgeStyle', this.edgeState.style['edgeStyle']);
+                }
+            
+                mxConnectionHandlerUpdateEdgeState.apply(this, arguments);
+            };
+            mxGraphViewGetPerimeterPoint = mxGraphView.prototype.getPerimeterPoint;
+				mxGraphView.prototype.getPerimeterPoint = function(terminal, next, orthogonal, border)
+				{
+					var point = mxGraphViewGetPerimeterPoint.apply(this, arguments);
+					
+					if (point != null)
+					{
+						var perimeter = this.getPerimeterFunction(terminal);
+
+						if (terminal.text != null && terminal.text.boundingBox != null)
+						{
+							// Adds a small border to the label bounds
+							var b = terminal.text.boundingBox.clone();
+							b.grow(3)
+
+							if (mxUtils.rectangleIntersectsSegment(b, point, next))
+							{
+								point = perimeter(b, terminal, next, orthogonal);
+							}
+						}
+					}
+					
+					return point;
+				};
+			    
+            
+            mxEvent.disableContextMenu(container);
+
+
+            let graph = new mxGraph(container);
+
+            //Active la possibilité de connexion entre les boites
+            graph.setConnectable(false);
+
+            //Active la possibilité de bouger les labels boites
+            graph.setVertexLabelsMovable(false);
+
+            graph.setAllowDanglingEdges(false);
+            graph.setDisconnectOnMove(false);
+
+            // Desactivation des connections flotante
+            if (graph.connectionHandler.connectImage == null)
+				{
+					graph.connectionHandler.isConnectableCell = function(cell)
+					{
+					   return false;
+					};
+					mxEdgeHandler.prototype.isConnectableCell = function(cell)
+					{
+						return graph.connectionHandler.isConnectableCell(cell);
+					};
+				}
+            graph.getAllConnectionConstraints = function(terminal)
+            {
+                if (terminal != null && this.model.isVertex(terminal.cell))
+                {
+                    return [new mxConnectionConstraint(new mxPoint(0.5, 0), true),
+                        new mxConnectionConstraint(new mxPoint(0, 0.5), true),
+                        new mxConnectionConstraint(new mxPoint(1, 0.5), true),
+                        new mxConnectionConstraint(new mxPoint(0.5, 1), true)];
+                }
+
+                return null;
+            };	
+                
+            //Active 
+            new mxRubberband(graph);
+            let parent = graph.getDefaultParent();
+
+            //Création de la feuille de style.
+            configureStyleSheet(graph);
+
+            graph.getModel().beginUpdate();
+            try
+            {
+                let v1 = graph.insertVertex(parent, null, 'Hello', 20, 20, 200, 120, "resizable=0");
+                let v2 = graph.insertVertex(parent, null, 'World', 500, 300, 200, 120, "image");
+                let e1 = graph.insertEdge(parent, null, 'banane', v1, v2,
+                    'edgeStyle=elbowEdgeStyle;'+
+					'exitX=0.5;exitY=1;exitPerimeter=2;entryX=0;entryY=0;entryPerimeter=1;');
+            }
+            finally
+            {
+                graph.getModel().endUpdate();
+            }
+        }
+    };
+
+    function configureStyleSheet(graph)
+    {
+        var style = new Object();
+        style[mxConstants.STYLE_SHAPE] = mxConstants.SHAPE_LABEL;
+        //style[mxConstants.STYLE_STROKECOLOR] = '#111111';
+        style[mxConstants.STYLE_PERIMETER] = mxPerimeter.RectanglePerimeter;
+        style[mxConstants.STYLE_IMAGE] = "images/icons48/bouton__ap_nb.svg";
+        style[mxConstants.STYLE_FONTCOLOR] = '#8eb9a9';
+        //style[mxConstants.STYLE_LABEL_BACKGROUNDCOLOR] = '#FFFFFF';
+        style[mxConstants.STYLE_IMAGE_ALIGN] = mxConstants.ALIGN_LEFT;
+        style[mxConstants.STYLE_IMAGE_VERTICAL_ALIGN] = mxConstants.ALIGN_MIDDLE;
+        style[mxConstants.STYLE_ALIGN] = mxConstants.ALIGN_RIGHT;
+        style[mxConstants.STYLE_VERTICAL_ALIGN] = mxConstants.ALIGN_MIDDLE;
+        style[mxConstants.STYLE_SPACING] = '5';
+        style[mxConstants.STYLE_IMAGE_WIDTH] = '50';
+        style[mxConstants.STYLE_IMAGE_HEIGHT] = '75';
+        style[mxConstants.STYLE_FONTSIZE] = '30'
+        graph.getStylesheet().putCellStyle('image', style);
+    };
+
+    </script>
+
+</head>
+<body onload="main(document.getElementById('graphContainer'))">
+    <div id="graphContainer"
+        style="position:relative;overflow:hidden;width:1024px;height:512px;background:url('editors/images/grid.gif');cursor:default;">
+    </div>
+</body>
+</html>
